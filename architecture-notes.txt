@@ -1,0 +1,62 @@
+# Content Broadcasting System - Architecture Notes
+
+## 1. Authentication & RBAC Flow
+- **Standard**: Uses JWT (JSON Web Tokens) for stateless authentication.
+- **Roles**: Two roles are supported: `teacher` and `principal`.
+- **Flow**: 
+    1. User registers/logins and receives a JWT token.
+    2. The token is sent in the `Authorization: Bearer <token>` header for protected routes.
+    3. `auth` middleware verifies the token and attaches the user object to `req.user`.
+    4. `authorize` middleware checks if `req.user.role` matches the required role for the endpoint.
+
+## 2. Upload Handling (Local + Cloudinary)
+- **Local Storage**: Files are first handled by `multer` and saved in the `/uploads` directory. This ensures we always have a local backup.
+- **Cloud Storage**: The file is then uploaded to Cloudinary using a utility service.
+- **Fallback**: If Cloudinary upload fails, the system automatically falls back to using the local file URL (`/uploads/filename`).
+- **Safety**: File types are restricted (jpg, png, gif) and size is capped at 10MB.
+
+## 3. Approval Workflow
+- **Submission**: Teachers upload content; it defaults to `pending` status.
+- **Review**: Only Principals can view the list of pending content.
+- **Decision**: 
+    - Principals can **Approve** (sets status to `approved`, records who approved it and when).
+    - Principals can **Reject** (sets status to `rejected`, requires a reason).
+- **Security**: Only approved content can be scheduled or seen in the live broadcast.
+
+## 4. Scheduling Logic (Rotation System)
+- **Filters**: Only `approved` content within its scheduled `start_time` and `end_time` window is considered.
+- **Cycle**: All valid content is grouped and sorted to create a continuous "playlist".
+- **Algorithm**:
+    1. Calculate the `total_duration` of all scheduled items.
+    2. Calculate `current_position = (current_timestamp % total_duration)`.
+    3. Iterate through the items until the accumulated time matches the current position.
+- **Result**: Ensures a seamless, looping broadcast that changes automatically based on time.
+
+## 5. Database Design Decisions
+- **ORM**: Sequelize (PostgreSQL) for type safety and easy relationship management.
+- **UUIDs**: Used for all primary keys (IDs) to prevent ID enumeration and make merging databases easier in the future.
+- **Underscored**: Database columns use `snake_case` (e.g., `created_at`) while JS objects use `camelCase` for consistency with JS standards.
+- **Hiding Sensitive Data**: The `User` model uses a `defaultScope` to ensure passwords are never accidentally leaked in API responses.
+
+## 6. Folder Structure
+- `src/config`: Environment and service configurations (DB, Cloudinary).
+- `src/models`: Database schemas and associations.
+- `src/services`: Business logic and database operations (The "brain" of the app).
+- `src/controllers`: Request/Response handling.
+- `src/routes`: API endpoint definitions.
+- `src/middlewares`: Security, validation, and error handling.
+- `src/utils`: Reusable helper functions.
+
+## 7. Middleware Usage
+- `helmet`: Security headers.
+- `cors`: Cross-origin resource sharing.
+- `morgan`: HTTP request logging.
+- `express-validator`: Input validation.
+- `multer`: File upload handling.
+- `errorHandler`: Centralized error catching and response formatting.
+
+## 8. Scalability Ideas
+- **Caching**: Use **Redis** to cache the result of `getActiveContent` for 1 minute to reduce database load during high traffic.
+- **Queues**: Use **BullMQ** or **RabbitMQ** for Cloudinary uploads. Currently, uploads are synchronous; offloading them to a background worker would make the API faster.
+- **Database Indexing**: Add indexes on `status`, `subject`, and `uploaded_by` columns for faster filtering as the content grows.
+- **CDN**: Use Cloudinary's built-in CDN or integrate CloudFront to serve the `/uploads` folder if local storage becomes a primary source.
