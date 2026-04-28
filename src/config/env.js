@@ -7,6 +7,7 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 3000,
   db: {
+    url: process.env.DATABASE_URL,
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     name: process.env.DB_NAME,
