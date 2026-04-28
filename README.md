@@ -19,7 +19,7 @@ A production-ready Node.js backend for managing and broadcasting scheduled educa
 
 ### 2. Installation
 ```bash
-git clone <repository-url>
+git clone https://github.com/Dharmndr/Content-Broadcasting-System.git
 cd content-broadcasting-system
 npm install
 ```
